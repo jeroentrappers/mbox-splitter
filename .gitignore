@@ -1,0 +1,5 @@
+mbox-splitter
+mbox-splitter-cli
+*.mbox
+*_split/
+dist/

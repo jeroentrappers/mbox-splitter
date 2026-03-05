@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # CLI builds for all platforms via GoReleaser
+  release-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Native GUI builds per platform
+  release-gui:
+    needs: release-cli
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-amd64
+            deps: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+            tags: "production webkit2_41"
+            binary: mbox-splitter-gui
+          - os: macos-latest
+            name: darwin-arm64
+            deps: ""
+            tags: production
+            binary: mbox-splitter-gui
+          - os: windows-latest
+            name: windows-amd64
+            deps: ""
+            tags: production
+            binary: mbox-splitter-gui.exe
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        if: matrix.deps != ''
+        run: ${{ matrix.deps }}
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build GUI
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMIT="$(git rev-parse --short HEAD)"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}"
+          CGO_ENABLED=1 go build -tags "${{ matrix.tags }}" -ldflags "$LDFLAGS" -o "${{ matrix.binary }}" .
+
+      - name: Package
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "${{ matrix.name }}" == *windows* ]]; then
+            zip "mbox-splitter-gui_${VERSION}_${{ matrix.name }}.zip" "${{ matrix.binary }}"
+          else
+            tar czf "mbox-splitter-gui_${VERSION}_${{ matrix.name }}.tar.gz" "${{ matrix.binary }}"
+          fi
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "${{ matrix.name }}" == *windows* ]]; then
+            gh release upload "${VERSION}" "mbox-splitter-gui_${VERSION}_${{ matrix.name }}.zip" --clobber
+          else
+            gh release upload "${VERSION}" "mbox-splitter-gui_${VERSION}_${{ matrix.name }}.tar.gz" --clobber
+          fi

@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mbox-splitter</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f5f5f5;
+    color: #333;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 32px 20px;
+    --wails-draggable: drag;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 560px;
+    --wails-draggable: no-drag;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #111;
+  }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.04);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .drop-zone {
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 16px;
+  }
+
+  .drop-zone:hover { border-color: #aaa; }
+  .drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; }
+  .drop-zone.has-file { border-color: #16a34a; background: #f0fdf4; }
+  .drop-zone p { color: #888; font-size: 14px; line-height: 1.5; }
+  .drop-zone.has-file p { color: #16a34a; font-weight: 500; }
+  .drop-zone .sub { font-size: 12px; color: #aaa; margin-top: 4px; }
+  .drop-zone.has-file .sub { color: #4ade80; }
+
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 6px;
+  }
+
+  .field { margin-bottom: 16px; }
+
+  input[type="text"], select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    background: #fff;
+  }
+
+  input[type="text"]:focus, select:focus { border-color: #2563eb; }
+
+  .size-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .size-row input { flex: 1; }
+  .size-row select { width: 90px; flex: none; }
+
+  .dir-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .dir-row input { flex: 1; }
+
+  .btn-browse {
+    padding: 9px 14px;
+    background: #f5f5f5;
+    color: #555;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+
+  .btn-browse:hover { background: #eee; }
+
+  .path-input {
+    font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 13px !important;
+  }
+
+  button.primary {
+    width: 100%;
+    padding: 11px;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  button.primary:hover { background: #1d4ed8; }
+  button.primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+  .results { display: none; }
+  .results.visible { display: block; }
+
+  .results h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .results-summary {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 10px;
+  }
+
+  .output-dir {
+    font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 12px;
+    color: #666;
+    background: #f5f5f5;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    word-break: break-all;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    text-align: left;
+    font-weight: 500;
+    color: #888;
+    padding: 6px 8px;
+    border-bottom: 1px solid #eee;
+    font-size: 12px;
+  }
+
+  td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #f5f5f5;
+  }
+
+  td.mono {
+    font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+    font-size: 12px;
+  }
+
+  td.num { text-align: right; }
+
+  .error-msg {
+    color: #dc2626;
+    background: #fef2f2;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+    margin-bottom: 16px;
+  }
+
+  .error-msg.visible { display: block; }
+
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #fff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>mbox-splitter</h1>
+
+  <div class="card">
+    <div class="drop-zone" id="dropZone">
+      <p id="dropText">Drop an .mbox file here, or click to browse</p>
+      <div class="sub" id="fileSub"></div>
+    </div>
+
+    <div class="field">
+      <label>Max file size</label>
+      <div class="size-row">
+        <input type="text" id="sizeValue" value="100">
+        <select id="sizeUnit">
+          <option value="MB" selected>MB</option>
+          <option value="GB">GB</option>
+          <option value="KB">KB</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Output directory</label>
+      <div class="dir-row">
+        <input type="text" id="outputDir" class="path-input" placeholder="Leave empty for default">
+        <button class="btn-browse" id="browseDir">Browse</button>
+      </div>
+    </div>
+
+    <button class="primary" id="splitBtn" disabled>Split mbox</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="results card" id="results">
+    <h2>Results</h2>
+    <div class="results-summary" id="resultsSummary"></div>
+    <div class="output-dir" id="outputDirResult"></div>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Size</th><th style="text-align:right">Messages</th></tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// Wails runtime bindings
+const dropZone = document.getElementById("dropZone");
+const dropText = document.getElementById("dropText");
+const fileSub = document.getElementById("fileSub");
+const sizeValue = document.getElementById("sizeValue");
+const sizeUnit = document.getElementById("sizeUnit");
+const outputDir = document.getElementById("outputDir");
+const browseDir = document.getElementById("browseDir");
+const splitBtn = document.getElementById("splitBtn");
+const errorMsg = document.getElementById("errorMsg");
+const results = document.getElementById("results");
+const resultsSummary = document.getElementById("resultsSummary");
+const outputDirResult = document.getElementById("outputDirResult");
+const resultsBody = document.getElementById("resultsBody");
+
+let selectedFilePath = "";
+
+function updateButton() {
+  splitBtn.disabled = !selectedFilePath;
+}
+
+function setFile(info) {
+  if (!info) return;
+  selectedFilePath = info.path;
+  dropText.textContent = info.name;
+  fileSub.textContent = info.sizeStr;
+  dropZone.classList.add("has-file");
+  updateButton();
+}
+
+// Click drop zone to open native file dialog
+dropZone.addEventListener("click", async () => {
+  try {
+    const info = await window.go.main.App.SelectFile();
+    if (info) setFile(info);
+  } catch (err) {
+    console.error("SelectFile error:", err);
+  }
+});
+
+// Drag-and-drop support
+["dragenter", "dragover"].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  });
+});
+
+["dragleave", "drop"].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+  });
+});
+
+dropZone.addEventListener("drop", async e => {
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    // Wails on Linux/macOS may provide the path via webkitRelativePath or name
+    const file = files[0];
+    const path = file.path || file.name;
+    try {
+      const info = await window.go.main.App.GetFileInfo(path);
+      if (info) setFile(info);
+    } catch (err) {
+      // If GetFileInfo fails, the path likely wasn't a full path
+      errorMsg.textContent = "Could not read dropped file. Please use the file browser instead.";
+      errorMsg.classList.add("visible");
+    }
+  }
+});
+
+// Browse for output directory
+browseDir.addEventListener("click", async () => {
+  try {
+    const dir = await window.go.main.App.SelectOutputDir();
+    if (dir) outputDir.value = dir;
+  } catch (err) {
+    console.error("SelectOutputDir error:", err);
+  }
+});
+
+// Split
+splitBtn.addEventListener("click", async () => {
+  errorMsg.classList.remove("visible");
+  results.classList.remove("visible");
+
+  if (!selectedFilePath) return;
+
+  splitBtn.disabled = true;
+  splitBtn.innerHTML = '<span class="spinner"></span>Splitting...';
+
+  try {
+    const maxSize = sizeValue.value + sizeUnit.value;
+    const result = await window.go.main.App.Split(selectedFilePath, maxSize, outputDir.value.trim());
+
+    resultsSummary.textContent =
+      "Split " + result.totalMessages + " messages into " + result.files.length + " files";
+    outputDirResult.textContent = result.outputDir;
+    resultsBody.innerHTML = "";
+
+    for (const f of result.files) {
+      const tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="mono">' + esc(f.name) + '</td>' +
+        '<td>' + esc(f.sizeStr) + '</td>' +
+        '<td class="num">' + f.messages + '</td>';
+      resultsBody.appendChild(tr);
+    }
+
+    results.classList.add("visible");
+  } catch (err) {
+    errorMsg.textContent = err.message || String(err);
+    errorMsg.classList.add("visible");
+  } finally {
+    splitBtn.disabled = false;
+    splitBtn.textContent = "Split mbox";
+    updateButton();
+  }
+});
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
