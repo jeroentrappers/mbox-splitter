@@ -81,7 +81,7 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           if [[ "${{ matrix.name }}" == *windows* ]]; then
-            zip "mbox-splitter-gui_${VERSION}_${{ matrix.name }}.zip" "${{ matrix.binary }}"
+            pwsh -Command "Compress-Archive -Path '${{ matrix.binary }}' -DestinationPath 'mbox-splitter-gui_${VERSION}_${{ matrix.name }}.zip'"
           else
             tar czf "mbox-splitter-gui_${VERSION}_${{ matrix.name }}.tar.gz" "${{ matrix.binary }}"
           fi
