@@ -1,0 +1,9 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "mbox-splitter",
+  "outputfilename": "mbox-splitter",
+  "frontend:dir": "frontend",
+  "author": {
+    "name": ""
+  }
+}
